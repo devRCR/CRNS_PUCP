@@ -4,7 +4,7 @@
  * Fecha: 31/05/2024
  * Descripción: Este proyecto utiliza un ESP32 para registrar y monitorear
  *              los datos de dos detectores, almacenando la información en
- *              una tarjeta SD y enviándola a la plataforma Ubidots.
+ *              una tarjeta SD.
  */
  
 #include <Wire.h>
@@ -12,19 +12,6 @@
 #include "FS.h"
 #include "SD.h"
 #include <SPI.h>
-#include "UbidotsEsp32Mqtt.h"
-
-/****************************************
- *  Datos para la conexión con Ubidots
- ****************************************/
-const char *UBIDOTS_TOKEN = "BBUS-U17lDn5hAx5YEO3cuYxiIwHKFXSNv1";
-const char *WIFI_SSID = "POCO_F5";
-const char *WIFI_PASS = "87654321";
-const char *DEVICE_LABEL = "ESP32_IPEN";
-const char *VARIABLE_LABEL_1 = "Detector1";
-const char *VARIABLE_LABEL_2 = "Detector2";
-
-Ubidots ubidots(UBIDOTS_TOKEN);
 
 /****************************************
  *  Configuración de la tarjeta SD
@@ -81,11 +68,6 @@ void setup() {
   Serial.begin(9600); // Inicializar comunicación serial
   Wire.begin(); // Inicializar comunicación I2C
 
-  // Conectar a WiFi y configurar Ubidots
-  ubidots.connectToWifi(WIFI_SSID, WIFI_PASS);
-  ubidots.setup();
-  ubidots.reconnect();
-
   setupRTC(); // Configurar el RTC
   setupSDCard(); // Configurar la tarjeta SD
   setupInterrupts(); // Configurar las interrupciones
@@ -137,14 +119,12 @@ void setupInterrupts() {
 void loop() {
   DateTime now = rtc.now(); // Obtener la fecha y hora actuales
 
-  if (millis() - lastTime >= 60000) { // 60000 ms para 60 segundos
+  if (millis() - lastTime >= 60000) { // 60000 ms para 60 segundos, cambiar a 3600000 para una hora
     // Desactivar interrupciones mientras se guardan los datos
     detachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN1));
     detachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN2));
 
     logData(now); // Registrar datos en la tarjeta SD
-
-    publishDataToUbidots(); // Publicar datos en Ubidots
 
     // Reiniciar contadores
     pulseCount1 = 0;
@@ -156,8 +136,6 @@ void loop() {
 
     lastTime = millis(); // Actualizar la marca de tiempo
   }
-
-  ubidots.loop(); // Mantener la conexión con Ubidots
 }
 
 /****************************************
@@ -190,20 +168,6 @@ void createLogFileIfNeeded(DateTime now) {
     Serial.println("El archivo ya existe"); // El archivo ya existe
   }
   file.close();
-}
-
-/****************************************
- *  Función para Publicar Datos en Ubidots
- ****************************************/
-void publishDataToUbidots() {
-  Serial.print("DET1: ");
-  Serial.print(pulseCount1); // Imprimir el contador del Detector 1
-  Serial.print(", DET2: ");
-  Serial.println(pulseCount2); // Imprimir el contador del Detector 2
-
-  ubidots.add(VARIABLE_LABEL_1, pulseCount1); // Añadir el valor del Detector 1 a Ubidots
-  ubidots.add(VARIABLE_LABEL_2, pulseCount2); // Añadir el valor del Detector 2 a Ubidots
-  ubidots.publish(DEVICE_LABEL); // Publicar los datos en Ubidots
 }
 
 /****************************************
